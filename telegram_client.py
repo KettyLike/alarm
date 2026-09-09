@@ -9,6 +9,7 @@ import sqlite3
 from urllib.parse import urlparse
 
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 
 
 MessageHandler = Callable[[str, str, int, int | None], Awaitable[None]]
@@ -24,7 +25,9 @@ class TelegramChannelClient:
         channels: tuple[str, ...],
         message_handler: MessageHandler,
     ) -> None:
-        self.client = TelegramClient(session_name, api_id, api_hash)
+        string_session = os.getenv("TELEGRAM_STRING_SESSION", "").strip()
+        session = StringSession(string_session) if string_session else session_name
+        self.client = TelegramClient(session, api_id, api_hash)
         self.channels = channels
         self.message_handler = message_handler
 
