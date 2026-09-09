@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import base64
 from collections.abc import Awaitable, Callable
 import logging
+import os
+from pathlib import Path
 import sqlite3
 from urllib.parse import urlparse
 
@@ -70,8 +73,29 @@ class TelegramChannelClient:
                     reply_to,
                 )
 
+    def restore_session_from_environment(self) -> None:
+        encoded_session = os.getenv("TELEGRAM_SESSION_BASE64", "").strip()
+        if not encoded_session:
+            return
+
+        session_path = Path(f"{self.client.session.filename}.session")
+        if session_path.exists():
+            return
+
+        try:
+            session_data = base64.b64decode(encoded_session, validate=True)
+        except ValueError as error:
+            raise ValueError(
+                "TELEGRAM_SESSION_BASE64 має містити коректний Base64 session-файл."
+            ) from error
+
+        session_path.parent.mkdir(parents=True, exist_ok=True)
+        session_path.write_bytes(session_data)
+        logger.info("Telegram session відновлено у %s", session_path)
+
     async def run(self) -> None:
         try:
+            self.restore_session_from_environment()
             await self.client.start()
         except sqlite3.OperationalError as error:
             if "locked" not in str(error).lower():
