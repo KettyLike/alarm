@@ -77,6 +77,9 @@ class TelegramChannelClient:
                 )
 
     def restore_session_from_environment(self) -> None:
+        if os.getenv("TELEGRAM_STRING_SESSION", "").strip():
+            return
+
         encoded_session = os.getenv("TELEGRAM_SESSION_BASE64", "").strip()
         if not encoded_session:
             chunks: list[str] = []
