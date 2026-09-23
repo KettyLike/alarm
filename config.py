@@ -18,20 +18,12 @@ def _required(name: str) -> str:
     return value
 
 
-def _bool(name: str, default: bool) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.lower() in {"1", "true", "yes", "y", "так"}
-
-
 @dataclass(frozen=True)
 class Settings:
     user_lat: float
     user_lon: float
     alert_radius_km: float
     context_minutes: int
-    alert_sound: bool
     telegram_bot_token: str | None
     telegram_alert_chat_ids: tuple[str, ...]
     telegram_api_id: int | None
@@ -61,7 +53,6 @@ def load_settings() -> Settings:
         user_lon=float(os.getenv("USER_LON", "30.5234")),
         alert_radius_km=float(os.getenv("ALERT_RADIUS_KM", "40")),
         context_minutes=int(os.getenv("MESSAGE_CONTEXT_MINUTES", "20")),
-        alert_sound=_bool("ALERT_SOUND", True),
         telegram_bot_token=bot_token or None,
         telegram_alert_chat_ids=alert_chat_ids,
         telegram_api_id=int(api_id) if api_id else None,

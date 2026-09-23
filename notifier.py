@@ -44,13 +44,12 @@ def _send_telegram_message(token: str, chat_id: str, message: str) -> None:
 
 async def notify_local(
     message: str,
-    sound: bool = True,
     bot_token: str | None = None,
     alert_chat_ids: tuple[str, ...] = (),
 ) -> None:
     logger.warning("ALERT: %s", message)
     if bot_token:
-        for chat_id in alert_chat_ids:
+        async def send_to_chat(chat_id: str) -> None:
             try:
                 await asyncio.to_thread(
                     _send_telegram_message,
@@ -65,13 +64,4 @@ async def notify_local(
                     chat_id,
                 )
 
-    if not sound:
-        return
-
-    try:
-        import winsound
-
-        for _ in range(3):
-            winsound.Beep(1200, 600)
-    except (ImportError, RuntimeError):
-        print("\a" * 3, end="", flush=True)
+        await asyncio.gather(*(send_to_chat(chat_id) for chat_id in alert_chat_ids))

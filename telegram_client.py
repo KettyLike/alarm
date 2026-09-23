@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 from collections.abc import Awaitable, Callable
 import logging
@@ -30,6 +31,18 @@ class TelegramChannelClient:
         self.client = TelegramClient(session, api_id, api_hash)
         self.channels = channels
         self.message_handler = message_handler
+
+    async def _process_message(
+        self,
+        channel: str,
+        text: str,
+        message_id: int,
+        reply_to_id: int | None,
+    ) -> None:
+        try:
+            await self.message_handler(channel, text, message_id, reply_to_id)
+        except Exception:
+            logger.exception("Помилка обробки Telegram-повідомлення %s", message_id)
 
     @staticmethod
     def normalize_channel_reference(reference: str) -> str | int:
@@ -69,11 +82,13 @@ class TelegramChannelClient:
             if text:
                 logger.info("Отримано повідомлення: %s", text[:200])
                 reply_to = event.message.reply_to_msg_id
-                await self.message_handler(
+                asyncio.create_task(
+                    self._process_message(
                     str(event.chat_id),
                     text,
                     event.message.id,
                     reply_to,
+                    )
                 )
 
     def restore_session_from_environment(self) -> None:
