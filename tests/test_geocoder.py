@@ -13,3 +13,9 @@ def test_finds_multiword_place() -> None:
     index = LocalPlaceIndex(Path(__file__).parents[1] / "places_ukraine.json")
     places = index.find_in_text("Загроза в районі Білої Церкви")
     assert places[0].name == "біла церква"
+
+
+def test_finds_kyiv_center_landmark_in_inflected_form() -> None:
+    index = LocalPlaceIndex(Path(__file__).parents[1] / "places_ukraine.json")
+    places = index.find_in_text("Загроза на Хрещатику")
+    assert [place.name for place in places] == ["хрещатик"]
