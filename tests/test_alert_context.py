@@ -52,3 +52,20 @@ def test_message_alerts_only_first_current_location(monkeypatch) -> None:
 
     assert len(alerts) == 1
     assert alerts[0].count("Можлива небезпека біля") == 1
+
+
+def test_updated_location_is_used_for_alert_distance(monkeypatch) -> None:
+    engine = AlertEngine(make_settings())
+    place = engine.place_index.find_in_text("Буча")[0]
+    alerts: list[str] = []
+
+    async def capture_alert(message: str, *args) -> None:
+        alerts.append(message)
+
+    monkeypatch.setattr(app, "notify_local", capture_alert)
+    engine.set_location(place.lat, place.lon)
+
+    asyncio.run(engine.handle_message("test", "Буча", 1, None))
+
+    assert len(alerts) == 1
+    assert ": 0.0 км." in alerts[0]

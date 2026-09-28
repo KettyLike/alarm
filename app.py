@@ -28,8 +28,17 @@ class StoredMessage:
 class AlertEngine:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
+        self.user_lat = settings.user_lat
+        self.user_lon = settings.user_lon
         self.place_index = LocalPlaceIndex(settings.places_path)
         self.messages: dict[tuple[str, int], StoredMessage] = {}
+
+    def set_location(self, latitude: float, longitude: float) -> None:
+        if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+            raise ValueError("Координати мають бути в межах широти ±90° і довготи ±180°")
+        self.user_lat = latitude
+        self.user_lon = longitude
+        logger.info("Центр моніторингу оновлено: %.6f, %.6f", latitude, longitude)
 
     async def handle_message(
         self,
@@ -55,8 +64,8 @@ class AlertEngine:
 
         place = found_places[0]
         distance_km = haversine_distance_km(
-            self.settings.user_lat,
-            self.settings.user_lon,
+            self.user_lat,
+            self.user_lon,
             place.lat,
             place.lon,
         )
@@ -94,7 +103,17 @@ async def run(settings: Settings, test_message: str | None) -> None:
         settings.telegram_channels,
         engine.handle_message,
     )
-    await client.run()
+    if settings.telegram_bot_token:
+        from telegram_bot import TelegramBotClient
+
+        bot = TelegramBotClient(
+            settings.telegram_bot_token,
+            settings.telegram_alert_chat_ids,
+            engine.set_location,
+        )
+        await asyncio.gather(client.run(), bot.run())
+    else:
+        await client.run()
 
 
 def main() -> None:
