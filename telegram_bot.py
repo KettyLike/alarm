@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 
 
 logger = logging.getLogger(__name__)
-LocationHandler = Callable[[float, float], None]
+LocationHandler = Callable[[str, float, float], None]
 
 
 def _request_telegram(token: str, method: str, payload: dict[str, object]) -> dict:
@@ -92,7 +92,7 @@ class TelegramBotClient:
         if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
             return
 
-        self.location_handler(latitude, longitude)
+        self.location_handler(str(chat_id), latitude, longitude)
         await self._request(
             "sendMessage",
             {

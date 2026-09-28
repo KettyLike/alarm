@@ -6,19 +6,23 @@ from app import AlertEngine
 from config import Settings
 
 
-def make_settings() -> Settings:
+def make_settings(
+    alert_chat_ids: tuple[str, ...] = (),
+    alert_radius_km: float = 140,
+) -> Settings:
     return Settings(
         user_lat=50.4501,
         user_lon=30.5234,
-        alert_radius_km=140,
+        alert_radius_km=alert_radius_km,
         context_minutes=20,
         telegram_bot_token=None,
-        telegram_alert_chat_ids=(),
+        telegram_alert_chat_ids=alert_chat_ids,
         telegram_api_id=None,
         telegram_api_hash=None,
         telegram_session="test",
         telegram_channels=(),
         places_path=Path(__file__).parents[1] / "places_ukraine.json",
+        user_locations_path=Path(":memory:"),
     )
 
 
@@ -55,17 +59,19 @@ def test_message_alerts_only_first_current_location(monkeypatch) -> None:
 
 
 def test_updated_location_is_used_for_alert_distance(monkeypatch) -> None:
-    engine = AlertEngine(make_settings())
-    place = engine.place_index.find_in_text("Буча")[0]
-    alerts: list[str] = []
+    engine = AlertEngine(make_settings(("101", "202"), alert_radius_km=40))
+    landmark = engine.place_index.find_in_text("Хрещатик")[0]
+    alerts: list[tuple[str, tuple[str, ...]]] = []
 
     async def capture_alert(message: str, *args) -> None:
-        alerts.append(message)
+        alerts.append((message, args[-1]))
 
     monkeypatch.setattr(app, "notify_local", capture_alert)
-    engine.set_location(place.lat, place.lon)
+    engine.set_location("101", 50.0767, 29.9177)
+    engine.set_location("202", landmark.lat, landmark.lon)
 
-    asyncio.run(engine.handle_message("test", "Буча", 1, None))
+    asyncio.run(engine.handle_message("test", "Хрещатик", 1, None))
 
     assert len(alerts) == 1
-    assert ": 0.0 км." in alerts[0]
+    assert ": 0.0 км." in alerts[0][0]
+    assert alerts[0][1] == ("202",)

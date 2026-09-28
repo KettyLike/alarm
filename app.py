@@ -11,6 +11,7 @@ from distance import haversine_distance_km
 from geocoder import LocalPlaceIndex
 from notifier import notify_local
 from parser import clean_message
+from user_locations import UserLocationStore
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -28,17 +29,15 @@ class StoredMessage:
 class AlertEngine:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.user_lat = settings.user_lat
-        self.user_lon = settings.user_lon
+        self.user_locations = UserLocationStore(settings.user_locations_path)
         self.place_index = LocalPlaceIndex(settings.places_path)
         self.messages: dict[tuple[str, int], StoredMessage] = {}
 
-    def set_location(self, latitude: float, longitude: float) -> None:
+    def set_location(self, chat_id: str, latitude: float, longitude: float) -> None:
         if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
             raise ValueError("Координати мають бути в межах широти ±90° і довготи ±180°")
-        self.user_lat = latitude
-        self.user_lon = longitude
-        logger.info("Центр моніторингу оновлено: %.6f, %.6f", latitude, longitude)
+        self.user_locations.set(chat_id, latitude, longitude)
+        logger.info("Центр моніторингу оновлено для чату %s", chat_id)
 
     async def handle_message(
         self,
@@ -63,23 +62,38 @@ class AlertEngine:
             return
 
         place = found_places[0]
-        distance_km = haversine_distance_km(
-            self.user_lat,
-            self.user_lon,
-            place.lat,
-            place.lon,
-        )
-        logger.info("%s: %s, %.1f км", channel, place.name, distance_km)
+        recipients = self.settings.telegram_alert_chat_ids or (None,)
+        for chat_id in recipients:
+            saved_location = (
+                self.user_locations.get(chat_id) if chat_id is not None else None
+            )
+            latitude, longitude = saved_location or (
+                self.settings.user_lat,
+                self.settings.user_lon,
+            )
+            distance_km = haversine_distance_km(
+                latitude,
+                longitude,
+                place.lat,
+                place.lon,
+            )
+            logger.info(
+                "%s: %s, %.1f км для чату %s",
+                channel,
+                place.name,
+                distance_km,
+                chat_id,
+            )
 
-        if distance_km > self.settings.alert_radius_km:
-            return
+            if distance_km > self.settings.alert_radius_km:
+                continue
 
-        await notify_local(
-            f"Можлива небезпека біля {place.name}: {distance_km:.1f} км. "
-            f"Повідомлення: {text}",
-            self.settings.telegram_bot_token,
-            self.settings.telegram_alert_chat_ids,
-        )
+            await notify_local(
+                f"Можлива небезпека біля {place.name}: {distance_km:.1f} км. "
+                f"Повідомлення: {text}",
+                self.settings.telegram_bot_token,
+                (chat_id,) if chat_id is not None else (),
+            )
 
 
 async def run(settings: Settings, test_message: str | None) -> None:

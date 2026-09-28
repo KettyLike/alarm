@@ -31,6 +31,7 @@ class Settings:
     telegram_session: str
     telegram_channels: tuple[str, ...]
     places_path: Path
+    user_locations_path: Path
 
 
 def load_settings() -> Settings:
@@ -60,4 +61,7 @@ def load_settings() -> Settings:
         telegram_session=os.getenv("TELEGRAM_SESSION", "air_alert_session"),
         telegram_channels=channels,
         places_path=ROOT_DIR / "places_ukraine.json",
+        user_locations_path=Path(
+            os.getenv("USER_LOCATIONS_DB", str(ROOT_DIR / "user_locations.sqlite3"))
+        ),
     )
